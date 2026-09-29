@@ -23,10 +23,10 @@ st.set_page_config(
 # 2. ROBUST PROJECT PATHS
 # ============================================================
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 ASSETS_DIR = BASE_DIR / "assets"
-SAMPLES_DIR = ASSETS_DIR / "samples"
+SAMPLES_DIR = BASE_DIR / "assets" / "samples"
 
 # IMPORTANT:
 # Your repository uses "model" (singular), not "models".
