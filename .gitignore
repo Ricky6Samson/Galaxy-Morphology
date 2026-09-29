@@ -1,0 +1,19 @@
+
+# Dataset - keep locally, don't upload
+data/Galaxy10_DECals.h5
+
+# Unwanted model checkpoints - keep locally, don't upload
+model/galaxy10_efficientnetb0_phase1.keras
+model/galaxy10_efficientnetb0_phase2_run1.keras
+model/galaxy10_efficientnetb0_phase3_augmented.keras
+
+# Streamlit model copies - don't upload
+galaxy_classifier_app/models/*.keras
+
+# Keep the Streamlit model we want
+!galaxy_classifier_app/models/galaxy10_efficientnetb0_phase2_run2.keras
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
