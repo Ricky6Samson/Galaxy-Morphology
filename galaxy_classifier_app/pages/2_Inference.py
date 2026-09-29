@@ -30,14 +30,7 @@ SAMPLES_DIR = BASE_DIR / "assets" / "samples"
 
 # IMPORTANT:
 # Your repository uses "model" (singular), not "models".
-MODEL_PATH = BASE_DIR / "model" / "galaxy10_efficientnetb0_phase2_run2.keras"
-
-st.write("Model directory:", BASE_DIR / "model")
-st.write("Model directory exists:", (BASE_DIR / "model").exists())
-st.write("Files in model folder:")
-
-if (BASE_DIR / "model").exists():
-    st.write([f.name for f in (BASE_DIR / "model").iterdir()])
+MODEL_PATH = BASE_DIR / "models" / "galaxy10_efficientnetb0_phase2_run2.keras"
 
 GALAXY10_IMAGE = ASSETS_DIR / "galaxy10.png"
 CONFUSION_MATRIX = ASSETS_DIR / "confusion_matrix.png"
