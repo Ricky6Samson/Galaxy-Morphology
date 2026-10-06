@@ -27,6 +27,8 @@ st.set_page_config(
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 MODEL_PATH = BASE_DIR / "model-2" / "galaxy10_efficientnetb0_phase3.keras"
+st.write("Model path:", MODEL_PATH)
+st.write("Model exists:", MODEL_PATH.exists())
 SAMPLES_DIR = BASE_DIR / "assets" / "samples"
 
 
