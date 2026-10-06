@@ -72,9 +72,9 @@ CLASS_DESCRIPTIONS = {
 # ============================================================
 
 @st.cache_resource
-def load_model():
+def load_classifier_model(model_path):
     try:
-        model = tf.keras.models.load_model(str(MODEL_PATH))
+        model = tf.keras.models.load_model(model_path)
         return model
     except Exception as e:
         st.error(f"Model exists, but could not be loaded: {e}")
