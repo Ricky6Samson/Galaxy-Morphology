@@ -26,7 +26,7 @@ st.set_page_config(
 # This file is assumed to be inside galaxy_classifier_app/pages/
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-MODEL_PATH = BASE_DIR / "models" / "galaxy10_efficientnetb0_phase3.keras"
+MODEL_PATH = BASE_DIR / "model-2" / "galaxy10_efficientnetb0_phase3.keras"
 SAMPLES_DIR = BASE_DIR / "assets" / "samples"
 
 
