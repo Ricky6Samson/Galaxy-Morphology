@@ -1,7 +1,12 @@
 import os
+from pathlib import Path
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+
+# Absolute path to the folder containing this Python file
+BASE_DIR = Path(__file__).resolve().parent
+ASSETS_DIR = BASE_DIR / "assets"
 
 # 1. Page Configuration
 st.set_page_config(
@@ -44,7 +49,7 @@ st.divider()
 
 # 4. Galaxy Classes Reference Image
 st.subheader("🌌 Galaxy10 DECals Morphological Classes")
-IMAGE_PATH = "assets/galaxy10.png"
+IMAGE_PATH = ASSETS_DIR / "galaxy10.png"
 
 if os.path.exists(IMAGE_PATH):
     st.image(
@@ -57,35 +62,88 @@ else:
 
 st.divider()
 
-# 5. Dataset Class Distribution Chart
-st.subheader("📊 Dataset Class Distribution")
+# 5. Conversion from 10 Classes to 6 Classes
+st.subheader("🔄 From 10 Galaxy10 Classes to 6 Morphological Classes")
 
-distribution_data = {
-    "Class": list(range(10)),
-    "Class Name": [
-        "Distorted Galaxy",
-        "Merging Galaxies",
-        "Round Elliptical",
-        "In-between Elliptical",
-        "Cigar Elliptical",
+st.markdown("""
+The original Galaxy10 DECaLS dataset contains 10 morphological classes. 
+For the application, related morphological categories are grouped into six broader classes 
+to provide a more interpretable classification scheme.
+""")
+
+class_mapping = pd.DataFrame({
+    "Original Galaxy10 Classes": [
+        "Disturbed",
+        "Merging",
+        "Round Smooth",
+        "In-between Round Smooth",
+        "Cigar Smooth",
         "Barred Spiral",
         "Unbarred Tight Spiral",
         "Unbarred Loose Spiral",
-        "Edge-on (No Bulge)",
-        "Edge-on (With Bulge)",
+        "Edge-on No Bulge",
+        "Edge-on With Bulge",
     ],
-    "Samples": [216, 371, 529, 405, 67, 409, 366, 526, 284, 375],
+    "6-Class Category": [
+        "Distorted",
+        "Merging",
+        "Elliptical",
+        "Elliptical",
+        "Elliptical",
+        "Barred Spiral",
+        "Unbarred Spiral",
+        "Unbarred Spiral",
+        "Edge-on",
+        "Edge-on",
+    ],
+})
+
+st.dataframe(
+    class_mapping,
+    hide_index=True,
+    use_container_width=True,
+)
+
+st.caption(
+    "Related Galaxy10 categories are merged based on their shared morphological characteristics."
+)
+
+st.divider()
+
+# 6. Dataset Class Distribution
+st.subheader("📊 Six-Class Dataset Distribution")
+
+distribution_data = {
+    "Class": [
+        "Distorted",
+        "Merging",
+        "Elliptical",
+        "Barred Spiral",
+        "Unbarred Spiral",
+        "Edge-on",
+    ],
+    "Samples": [
+        1081,
+        1853,
+        5006,
+        2043,
+        4457,
+        3296,
+    ],
 }
 
 df_dist = pd.DataFrame(distribution_data)
 
 fig = px.bar(
     df_dist,
-    x="Class Name",
+    x="Class",
     y="Samples",
     color="Samples",
     color_continuous_scale="Viridis",
-    labels={"Samples": "Image Count", "Class Name": "Morphological Class"},
+    labels={
+        "Samples": "Image Count",
+        "Class": "Morphological Class",
+    },
     text="Samples",
 )
 
@@ -95,30 +153,29 @@ fig.update_traces(
 )
 
 fig.update_layout(
-    xaxis_tickangle=-45,
+    xaxis_tickangle=-20,
     showlegend=False,
     height=450,
-    margin=dict(l=20, r=20, t=20, b=100),
+    margin=dict(l=20, r=20, t=20, b=70),
 )
 
 st.plotly_chart(fig, use_container_width=True)
 
 st.caption(
-    "Note the class imbalance across categories—for instance, Class 2 (Round Elliptical) "
-    "and Class 7 (Unbarred Loose Spiral) have over 500 samples each, whereas Class 4 (Cigar Elliptical) "
-    "represents a minority class with 67 samples."
+    "The six-class grouping reduces the original class imbalance by combining "
+    "morphologically related categories, while retaining the major structural distinctions."
 )
 
 st.divider()
 
-# 6. Model Diagnostics
+# 7. Model Diagnostics
 st.subheader("🔬 Model Diagnostics & Progression")
 
 diag_col1, diag_col2 = st.columns(2)
 
 with diag_col1:
     st.markdown("#### Confusion Matrix (Phase 2, Run 2)")
-    cm_path = "assets/confusion_matrix.png"
+    cm_path = ASSETS_DIR / "cm_phase3.png"
     if os.path.exists(cm_path):
         st.image(
             cm_path,
@@ -126,11 +183,13 @@ with diag_col1:
             use_container_width=True,
         )
     else:
-        st.info("Place `confusion_matrix.png` in your `assets/` folder to render the heatmap.")
+        st.info(
+            "Place `cm_phase3.png` in your `assets/` folder to render the heatmap."
+        )
 
 with diag_col2:
     st.markdown("#### Training & Validation History")
-    history_path = "assets/training_history.png"
+    history_path = ASSETS_DIR / "phase3_augmented_performance.png"
     if os.path.exists(history_path):
         st.image(
             history_path,
@@ -138,7 +197,9 @@ with diag_col2:
             use_container_width=True,
         )
     else:
-        st.info("Place `training_history.png` in your `assets/` folder to render the curves.")
+        st.info(
+            "Place `phase3_augmented_performance.png` in your `assets/` folder to render the curves."
+        )
 
 st.markdown("""
 **Key Diagnostic Insights:**
@@ -148,15 +209,15 @@ st.markdown("""
 
 st.divider()
 
-# 7. Model Iteration Table
+# 8. Model Iteration Table
 st.subheader("📈 Model Iteration Comparison")
 
 runs_data = {
     "Run / Phase": [
         "Phase 1",
         "Phase 2 - Run 1",
-        "Phase 2 - Run 2 (Best)",
-        "Phase 3 (Augmented)",
+        "Phase 2 - Run 2 ",
+        "Phase 3 - Augmented (Best)",
     ],
     "Architecture / Details": [
         "Baseline EfficientNetB0",
@@ -164,8 +225,8 @@ runs_data = {
         "Top 40 layers unfrozen run 2",
         "Augmented Images",
     ],
-    "Val Accuracy": ["63.36%", "69.59%", "71.98%", "71.65%"],
-    "Macro F1-Score": ["0.6062", "0.6759", "0.6979", "0.6910"],
+    "Val Accuracy": ["72.89%", "77.54%", "78.49%", "78.69%"],
+    "Macro F1-Score": ["0.6253", "0.6960", "0.7147", "0.7204"],
 }
 
 df_runs = pd.DataFrame(runs_data)
