@@ -78,7 +78,7 @@ def load_classifier_model(model_path):
         model = tf.keras.models.load_model(model_path)
         return model
     except Exception as e:
-        st.error(f"Model exists, but could not be loaded: {e}")
+        st.exception(e)
         return None
 
 
