@@ -72,15 +72,13 @@ CLASS_DESCRIPTIONS = {
 # ============================================================
 
 @st.cache_resource
-def load_classifier_model(path: str):
-    """Loads and caches the trained six-class model."""
-
-    if not os.path.exists(path):
+def load_model():
+    try:
+        model = tf.keras.models.load_model(str(MODEL_PATH))
+        return model
+    except Exception as e:
+        st.error(f"Model exists, but could not be loaded: {e}")
         return None
-
-    import tensorflow as tf
-
-    return tf.keras.models.load_model(path)
 
 
 # ============================================================
