@@ -260,7 +260,7 @@ diag_col1, diag_col2 = st.columns(2)
 with diag_col1:
     st.markdown("#### Six-Class Confusion Matrix")
 
-    cm_path = ASSETS_DIR / "cm_phase3_6class.png"
+    cm_path = ASSETS_DIR / "cm_phase3.png"
 
     if cm_path.exists():
         st.image(
@@ -277,7 +277,7 @@ with diag_col1:
 with diag_col2:
     st.markdown("#### Training & Validation History")
 
-    history_path = ASSETS_DIR / "phase3_augmented_performance_6class.png"
+    history_path = ASSETS_DIR / "phase3_augmented_performance.png"
 
     if history_path.exists():
         st.image(
