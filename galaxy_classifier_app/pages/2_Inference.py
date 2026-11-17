@@ -1,4 +1,4 @@
-import os
+
 from pathlib import Path
 
 import numpy as np
@@ -8,37 +8,40 @@ from PIL import Image
 import streamlit as st
 import tensorflow as tf
 
+from tensorflow.keras.applications.efficientnet import preprocess_input
+
 
 # ============================================================
 # 1. Page Configuration
 # ============================================================
 
 st.set_page_config(
-    page_title="Galaxy Classifier - Real-Time Inference",
+    page_title="Galaxy Morphology Classifier",
     page_icon="🔭",
     layout="wide",
 )
-
 
 # ============================================================
 # 2. Project Paths
 # ============================================================
 
-# This file is assumed to be inside galaxy_classifier_app/pages/
+# This file is inside galaxy_classifier_app/pages/
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-MODEL_PATH = BASE_DIR / "model-2" / "galaxy10_efficientnetb0_phase3.keras"
-st.write("Model path:", MODEL_PATH)
-st.write("Model exists:", MODEL_PATH.exists())
+MODEL_PATH = (
+    BASE_DIR
+    / "model-2"
+    / "galaxy10_efficientnetb0_phase3.keras"
+)
+
 SAMPLES_DIR = BASE_DIR / "assets" / "samples"
 
-
 # ============================================================
-# 3. Six-Class Morphological Classification
+# 3. Six-Class Model Configuration
 # ============================================================
 
 CLASS_NAMES = [
-    "Distorted Galaxy",
+    "Disturbed Galaxy",
     "Merging Galaxies",
     "Elliptical Galaxy",
     "Barred Spiral",
@@ -46,79 +49,72 @@ CLASS_NAMES = [
     "Edge-on Galaxy",
 ]
 
-
 CLASS_DESCRIPTIONS = {
-    "Distorted Galaxy":
-        "Shows a non-symmetric shape, tidal tails, or irregular structural disruption.",
+    "Disturbed Galaxy":
+        "Shows an asymmetric structure, tidal features, or irregular "
+        "morphological disruption.",
 
     "Merging Galaxies":
-        "Two or more gravitationally interacting galaxy cores in the process of merging.",
+        "Two or more gravitationally interacting galaxy cores "
+        "in the process of merging.",
 
     "Elliptical Galaxy":
-        "A smooth, featureless galaxy with an elliptical or rounded light profile.",
+        "A smooth galaxy with an elliptical or rounded light profile.",
 
     "Barred Spiral":
-        "Spiral galaxy featuring a prominent central linear bar structure of stars.",
+        "A spiral galaxy featuring a prominent central bar structure.",
 
     "Unbarred Spiral":
-        "Spiral galaxy with clearly defined spiral arms but without a central stellar bar.",
+        "A spiral galaxy with defined spiral arms but no prominent "
+        "central stellar bar.",
 
     "Edge-on Galaxy":
-        "A disk galaxy viewed nearly edge-on, producing a thin elongated profile.",
+        "A disk galaxy viewed nearly edge-on, producing a thin "
+        "elongated profile.",
 }
 
-
 # ============================================================
-# 4. Cached Model Loader
+# 4. Model Loader
 # ============================================================
 
 @st.cache_resource
 def load_classifier_model(model_path):
-    try:
-        model = tf.keras.models.load_model(model_path)
-        return model
-    except Exception as e:
-        st.exception(e)
-        return None
+    return tf.keras.models.load_model(model_path)
 
 
 # ============================================================
 # 5. Image Preprocessing
 # ============================================================
 
-def preprocess_image(
-    image: Image.Image,
-    target_size=(224, 224)
-) -> np.ndarray:
-
-    """Pads image to square aspect ratio, resizes, and preprocesses it."""
+def preprocess_image(image: Image.Image) -> np.ndarray:
+    """
+    Convert image to RGB, pad to a square, resize to 224x224,
+    and apply EfficientNet preprocessing.
+    """
 
     img = image.convert("RGB")
 
-    # Pad to square ratio to avoid distorting galaxy morphology
     max_dim = max(img.size)
 
     padded_img = Image.new(
         "RGB",
         (max_dim, max_dim),
-        (0, 0, 0)
+        (0, 0, 0),
     )
 
     padded_img.paste(
         img,
         (
             (max_dim - img.size[0]) // 2,
-            (max_dim - img.size[1]) // 2
-        )
+            (max_dim - img.size[1]) // 2,
+        ),
     )
 
-    resized_img = padded_img.resize(target_size)
+    resized_img = padded_img.resize((224, 224))
 
-    from tensorflow.keras.applications.efficientnet import preprocess_input
-
-    img_array = np.array(
+    img_array = np.asarray(
         resized_img,
-        dtype=np.float32
+        dtype=np.float32,
     )
 
     img_array = preprocess_input(img_array)
@@ -127,87 +123,241 @@ def preprocess_image(
 
 
 # ============================================================
-# 6. Header Section
+# 6. Prediction Probability Handling
+# ============================================================
+
+def get_probabilities(raw_predictions):
+
+    raw_predictions = np.asarray(
+        raw_predictions,
+        dtype=np.float64,
+    )
+
+    if not np.all(np.isfinite(raw_predictions)):
+        raise ValueError("Model returned invalid prediction values.")
+
+    # Convert logits to probabilities if necessary.
+    if (
+        raw_predictions.min() < 0
+        or raw_predictions.max() > 1
+        or not np.isclose(raw_predictions.sum(), 1.0, atol=1e-3)
+    ):
+
+        shifted = raw_predictions - np.max(raw_predictions)
+        exp_values = np.exp(shifted)
+
+        probabilities = exp_values / exp_values.sum()
+
+    else:
+        probabilities = raw_predictions
+
+    return probabilities
+
+
+# ============================================================
+# 7. Header
 # ============================================================
 
 st.title("🔭 Interactive Galaxy Morphology Classifier")
 
 st.markdown("""
-Upload custom optical astronomical images (JPG, JPEG, or PNG) to classify their
-morphological type according to the **Hubble Sequence** using your trained
-six-class deep learning model.
+Explore galaxy morphology using a deep learning classifier trained
+on the **Galaxy10 DECaLS dataset**.
+
+The project includes an original 10-class classification experiment
+and a subsequently developed six-class model for interactive
+image classification.
 """)
 
 st.divider()
 
 
 # ============================================================
-# 7. Sidebar Controls
+# 8. Original 10-Class Experiment
 # ============================================================
 
-st.sidebar.header("⚙️ Model Settings")
-
-IMAGE_SIZE = st.sidebar.selectbox(
-    "Target Image Resolution",
-    options=[
-        (224, 224),
-        (256, 256),
-        (69, 69)
-    ],
-    format_func=lambda x:
-        f"{x[0]} x {x[1]} "
-        f"{'(Default)' if x == (224, 224) else ''}",
-    index=0,
-    help="Select input resolution expected by your neural network",
-)
-
-
-# ============================================================
-# 8. Load Model
-# ============================================================
-
-model = load_classifier_model(str(MODEL_PATH))
-
-if model is None:
-
-    st.sidebar.warning(
-        f"⚠️ Model file not found at `{MODEL_PATH}`. "
-        "Using mock preview mode."
-    )
-
-else:
-
-    st.sidebar.success(
-        "✅ Six-class model loaded successfully!"
-    )
-
-
-# ============================================================
-# 9. Classification Notes
-# ============================================================
-
-with st.expander("📌 Note: Classification Performance & Edge Cases"):
+with st.expander(
+    "📊 Original Galaxy10 DECaLS Experiment",
+    expanded=True,
+):
 
     st.markdown("""
-    **Model Performance Observations:**
+    ### Dataset and classification
 
-    - **Distinct Morphologies:** Edge-on galaxies, barred spirals,
-      and merging galaxies contain strong structural features that
-      can help the model distinguish them.
+    The original experiment used the **Galaxy10 DECaLS dataset**,
+    containing 17,736 astronomical images across 10 morphological
+    categories.
 
-    - **Morphological Overlap:** Elliptical and distorted galaxies
-      can show overlapping visual characteristics, while barred and
-      unbarred spirals may be difficult to distinguish when the bar
-      structure is weak or obscured.
+    The 10-class experiment established the initial classification
+    pipeline and evaluation baseline.
+    """)
 
-    - **Six-Class Classification:** The original Galaxy10 DECaLS
-      categories are consolidated into six broader morphological
-      classes for the final classifier.
+    metric_cols = st.columns(4)
+
+    metric_cols[0].metric(
+        "Test Accuracy",
+        "71.98%",
+    )
+
+    metric_cols[1].metric(
+        "Macro Precision",
+        "0.70",
+    )
+
+    metric_cols[2].metric(
+        "Macro Recall",
+        "0.70",
+    )
+
+    metric_cols[3].metric(
+        "Test Images",
+        "3,548",
+    )
+
+    st.caption(
+        "These evaluation metrics belong to the original "
+        "10-class experiment, not the six-class model currently "
+        "used for predictions."
+    )
+
+    st.markdown("""
+    **Dataset:** Galaxy10 DECaLS
+
+    **Original categories:** 10 morphological classes
+
+    **Evaluation:** Classification accuracy, macro precision,
+    and macro recall on the original test set.
     """)
 
 
 # ============================================================
-# 10. Session State
+# 9. Six-Class Model Details
+# ============================================================
+
+with st.expander("🧠 Six-Class Model — Training and Validation"):
+
+    st.markdown("""
+    The original Galaxy10 categories were regrouped into six
+    broader morphological classes for the final interactive model.
+
+    **Model architecture**
+
+    - ImageNet-pretrained EfficientNetB0 backbone
+    - Global Average Pooling
+    - Dense layer with 256 ReLU units
+    - Dropout (0.4)
+    - Six-unit softmax output layer
+
+    **Training strategy**
+
+    - Phase 1: Frozen-backbone training
+    - Phase 2: Fine-tuning the upper backbone layers
+    - Phase 3: Augmented fine-tuning
+
+    **Final Phase 3 validation results**
+    """)
+
+    validation_cols = st.columns(3)
+
+    validation_cols[0].metric(
+        "Validation Accuracy",
+        "78.69%",
+    )
+
+    validation_cols[1].metric(
+        "Validation Loss",
+        "0.6096",
+    )
+
+    validation_cols[2].metric(
+        "Training Epochs",
+        "47",
+    )
+
+    st.caption(
+        "These are six-class validation results. They should not "
+        "be interpreted as the 10-class test-set metrics above."
+    )
+
+
+# ============================================================
+# 10. Classification Notes
+# ============================================================
+
+with st.expander("📌 Classification Notes and Limitations"):
+
+    st.markdown("""
+    - **Distinct morphologies:** Edge-on galaxies, barred spirals,
+      and merging galaxies may exhibit identifiable structural
+      features.
+
+    - **Morphological overlap:** Elliptical and disturbed galaxies
+      can share visual characteristics. Barred and unbarred spirals
+      may also be difficult to distinguish when the bar is weak
+      or obscured.
+
+    - **Six-class classification:** The deployed model predicts
+      one of six broader morphological categories derived from
+      the original Galaxy10 classification scheme.
+
+    - **Prediction confidence:** The displayed confidence is the
+      model's output probability for a predicted class. It is not
+      the model's measured classification accuracy.
+    """)
+
+
+st.divider()
+
+
+# ============================================================
+# 11. Load Six-Class Model
+# ============================================================
+
+if not MODEL_PATH.exists():
+
+    st.error(
+        f"Model file not found: {MODEL_PATH}"
+    )
+
+    st.stop()
+
+try:
+
+    model = load_classifier_model(str(MODEL_PATH))
+
+except Exception as error:
+
+    st.error("Unable to load the six-class classification model.")
+    st.exception(error)
+    st.stop()
+
+
+if model.output_shape[-1] != len(CLASS_NAMES):
+
+    st.error(
+        "Model output does not match the six-class configuration."
+    )
+
+    st.stop()
+
+
+st.sidebar.header("⚙️ Model Information")
+
+st.sidebar.success("Six-class Phase 3 model loaded")
+
+st.sidebar.markdown("""
+**Architecture:** EfficientNetB0
+
+**Input resolution:** 224 × 224
+
+**Output classes:** 6
+
+**Training stage:** Phase 3
+""")
+
+
+# ============================================================
+# 12. Session State
 # ============================================================
 
 if "selected_image" not in st.session_state:
@@ -218,17 +368,17 @@ if "image_source_name" not in st.session_state:
 
 
 # ============================================================
-# 11. Dual Column Interface
+# 13. Two-Column Interface
 # ============================================================
 
 col_input, col_display = st.columns(
     [1, 1],
-    gap="large"
+    gap="large",
 )
 
 
 # ============================================================
-# 12. Image Selection
+# 14. Image Selection
 # ============================================================
 
 with col_input:
@@ -239,7 +389,6 @@ with col_input:
         ["📤 Upload Image", "🖼️ Try Sample Image"]
     )
 
-
     # --------------------------------------------------------
     # Upload
     # --------------------------------------------------------
@@ -247,19 +396,28 @@ with col_input:
     with upload_tab:
 
         uploaded_file = st.file_uploader(
-            "Choose a galaxy image file",
+            "Choose a galaxy image",
             type=["jpg", "jpeg", "png"],
-            help="Supports standard optical astronomical images (RGB)",
+            help="Upload an optical astronomical image.",
         )
 
         if uploaded_file is not None:
 
-            st.session_state["selected_image"] = Image.open(
-                uploaded_file
-            )
+            try:
 
-            st.session_state["image_source_name"] = uploaded_file.name
+                uploaded_image = Image.open(
+                    uploaded_file
+                ).convert("RGB")
 
+                st.session_state["selected_image"] = uploaded_image
+
+                st.session_state["image_source_name"] = (
+                    uploaded_file.name
+                )
+
+            except Exception:
+
+                st.error("Unable to read the uploaded image.")
 
     # --------------------------------------------------------
     # Sample Images
@@ -267,33 +425,18 @@ with col_input:
 
     with sample_tab:
 
-        st.markdown(
-            "Test with sample astronomical images:"
-        )
-
-        sample_cols = st.columns(3)
+        st.markdown("Test the classifier using sample images:")
 
         sample_images = {
-
-            "Barred Spiral":
-                "sample_barred",
-
-            "Merging":
-                "sample_merging",
-
-            "Edge-on":
-                "sample_edgeon",
-
-            "Unbarred Spiral":
-                "sample_unbarred_spiral",
-
-            "Distorted":
-                "sample_distorted",
-
-            "Elliptical":
-                "sample_elliptical",
+            "Barred Spiral": "sample_barred",
+            "Merging": "sample_merging",
+            "Edge-on": "sample_edgeon",
+            "Unbarred Spiral": "sample_unbarred_spiral",
+            "Disturbed": "sample_distorted",
+            "Elliptical": "sample_elliptical",
         }
 
+        sample_cols = st.columns(3)
 
         for idx, (label, filename) in enumerate(
             sample_images.items()
@@ -303,25 +446,19 @@ with col_input:
 
             valid_path = None
 
-            # Look for supported image extensions
             for ext in [
-                ".jpeg",
-                ".jpg",
-                ".png",
-                ".JPEG",
-                ".JPG",
-                ".PNG"
+                ".jpg", ".jpeg", ".png",
+                ".JPG", ".JPEG", ".PNG",
             ]:
 
-                full_path = SAMPLES_DIR / f"{filename}{ext}"
+                candidate = SAMPLES_DIR / f"{filename}{ext}"
 
-                if full_path.exists():
+                if candidate.exists():
 
-                    valid_path = full_path
+                    valid_path = candidate
                     break
 
-
-            if valid_path:
+            if valid_path is not None:
 
                 if col.button(
                     f"Load {label}",
@@ -329,34 +466,35 @@ with col_input:
                     use_container_width=True,
                 ):
 
-                    st.session_state["selected_image"] = Image.open(
-                        valid_path
+                    st.session_state["selected_image"] = (
+                        Image.open(valid_path).convert("RGB")
                     )
 
                     st.session_state["image_source_name"] = (
                         f"Sample ({label})"
                     )
 
+                    st.rerun()
+
             else:
 
-                col.caption(
-                    f"`{label}` (missing)"
-                )
+                col.caption(f"{label} (missing)")
 
 
 # ============================================================
-# 13. Preview & Classification
+# 15. Preview and Classification
 # ============================================================
 
 with col_display:
 
-    st.subheader("2. Preview & Classification")
+    st.subheader("2. Preview and Classification")
 
+    selected_image = st.session_state["selected_image"]
 
-    if st.session_state["selected_image"] is not None:
+    if selected_image is not None:
 
         st.image(
-            st.session_state["selected_image"],
+            selected_image,
             caption=(
                 f"Input Image: "
                 f"{st.session_state['image_source_name']}"
@@ -364,205 +502,133 @@ with col_display:
             use_container_width=True,
         )
 
-
-        # ----------------------------------------------------
-        # Classification Button
-        # ----------------------------------------------------
-
         if st.button(
             "🚀 Classify Galaxy Morphology",
-            type="primary"
+            type="primary",
+            use_container_width=True,
         ):
 
             with st.spinner(
-                "Processing image through neural network..."
+                "Processing image through the neural network..."
             ):
 
-                # --------------------------------------------
-                # Preprocess
-                # --------------------------------------------
+                try:
 
-                input_tensor = preprocess_image(
-                    st.session_state["selected_image"],
-                    target_size=IMAGE_SIZE
-                )
+                    input_tensor = preprocess_image(
+                        selected_image
+                    )
 
-
-                # --------------------------------------------
-                # Model Prediction
-                # --------------------------------------------
-
-                if model is not None:
-
-                    raw_preds = model.predict(
+                    raw_predictions = model.predict(
                         input_tensor,
-                        verbose=0
+                        verbose=0,
                     )[0]
 
-                    # The Phase 3 model is a six-class model.
-                    if len(raw_preds) != 6:
+                    if len(raw_predictions) != 6:
 
                         st.error(
-                            f"Expected a six-class model, "
-                            f"but the loaded model returned "
-                            f"{len(raw_preds)} outputs."
+                            "Expected six model outputs, but received "
+                            f"{len(raw_predictions)}."
                         )
 
                         st.stop()
 
-
-                    # If outputs are logits rather than probabilities
-                    if (
-                        raw_preds.max() > 1.0
-                        or raw_preds.min() < 0.0
-                    ):
-
-                        exp_preds = np.exp(
-                            raw_preds - np.max(raw_preds)
-                        )
-
-                        probs = (
-                            exp_preds /
-                            exp_preds.sum()
-                        )
-
-                    else:
-
-                        probs = raw_preds
-
-
-                # --------------------------------------------
-                # Mock Preview
-                # --------------------------------------------
-
-                else:
-
-                    np.random.seed(
-                        len(
-                            st.session_state[
-                                "image_source_name"
-                            ]
-                        )
+                    probabilities = get_probabilities(
+                        raw_predictions
                     )
 
-                    raw_mock = np.random.dirichlet(
-                        np.ones(6)
+                    # ----------------------------------------
+                    # Top Prediction
+                    # ----------------------------------------
+
+                    top_idx = int(
+                        np.argmax(probabilities)
                     )
 
-                    probs = (
-                        raw_mock /
-                        raw_mock.sum()
+                    top_class = CLASS_NAMES[top_idx]
+
+                    top_confidence = (
+                        probabilities[top_idx] * 100
                     )
 
+                    st.divider()
 
-                # --------------------------------------------
-                # Top Prediction
-                # --------------------------------------------
+                    # ----------------------------------------
+                    # Prediction Metrics
+                    # ----------------------------------------
 
-                top_idx = int(
-                    np.argmax(probs)
-                )
+                    metric_col1, metric_col2 = st.columns(2)
 
-                top_class = CLASS_NAMES[top_idx]
-
-                top_conf = (
-                    probs[top_idx] * 100
-                )
-
-
-                st.markdown("---")
-
-
-                # --------------------------------------------
-                # Prediction Metrics
-                # --------------------------------------------
-
-                m_col1, m_col2 = st.columns(2)
-
-
-                with m_col1:
-
-                    st.metric(
-                        label="Predicted Class",
-                        value=top_class,
+                    metric_col1.metric(
+                        "Predicted Class",
+                        top_class,
                     )
 
-
-                with m_col2:
-
-                    st.metric(
-                        label="Confidence Score",
-                        value=f"{top_conf:.2f}%",
+                    metric_col2.metric(
+                        "Confidence Score",
+                        f"{top_confidence:.2f}%",
                     )
 
+                    # ----------------------------------------
+                    # Description
+                    # ----------------------------------------
 
-                # --------------------------------------------
-                # Description
-                # --------------------------------------------
+                    st.info(
+                        f"💡 **Description:** "
+                        f"{CLASS_DESCRIPTIONS[top_class]}"
+                    )
 
-                st.info(
-                    f"💡 **Description:** "
-                    f"{CLASS_DESCRIPTIONS[top_class]}"
-                )
+                    # ----------------------------------------
+                    # Probability Distribution
+                    # ----------------------------------------
 
+                    st.markdown(
+                        "#### Probability Distribution Across Six Classes"
+                    )
 
-                # =================================================
-                # Six-Class Probability Distribution
-                # =================================================
+                    df_probs = pd.DataFrame({
+                        "Morphological Class": CLASS_NAMES,
+                        "Confidence (%)": probabilities * 100,
+                    }).sort_values(
+                        "Confidence (%)",
+                        ascending=True,
+                    )
 
-                st.markdown(
-                    "#### Probability Distribution Across 6 Classes"
-                )
+                    fig_probs = px.bar(
+                        df_probs,
+                        x="Confidence (%)",
+                        y="Morphological Class",
+                        orientation="h",
+                        text_auto=".2f",
+                        color="Confidence (%)",
+                        color_continuous_scale="Blues",
+                    )
 
+                    fig_probs.update_layout(
+                        height=380,
+                        margin=dict(
+                            l=10,
+                            r=10,
+                            t=10,
+                            b=10,
+                        ),
+                        showlegend=False,
+                        xaxis_title="Confidence (%)",
+                        yaxis_title="",
+                    )
 
-                df_probs = pd.DataFrame(
-                    {
-                        "Morphological Class":
-                            CLASS_NAMES,
+                    st.plotly_chart(
+                        fig_probs,
+                        use_container_width=True,
+                    )
 
-                        "Confidence (%)":
-                            probs * 100,
-                    }
-                ).sort_values(
-                    "Confidence (%)",
-                    ascending=True
-                )
+                except Exception as error:
 
-
-                fig_probs = px.bar(
-                    df_probs,
-                    x="Confidence (%)",
-                    y="Morphological Class",
-                    orientation="h",
-                    text_auto=".2f",
-                    color="Confidence (%)",
-                    color_continuous_scale="Blues",
-                )
-
-
-                fig_probs.update_layout(
-                    height=380,
-                    margin=dict(
-                        l=10,
-                        r=10,
-                        t=10,
-                        b=10
-                    ),
-                    showlegend=False,
-                    xaxis_title="Confidence Percentage (%)",
-                    yaxis_title="",
-                )
-
-
-                st.plotly_chart(
-                    fig_probs,
-                    use_container_width=True
-                )
-
+                    st.error("Classification failed.")
+                    st.exception(error)
 
     else:
 
         st.info(
             "👈 Upload an image or select a sample galaxy "
-            "to begin analysis."
+            "to begin classification."
         )
