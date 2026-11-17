@@ -1,16 +1,21 @@
+
 import os
 from pathlib import Path
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-# Absolute path to the folder containing this Python file
+# ------------------------------------------------------------
+# 1. Paths and Page Configuration
+# ------------------------------------------------------------
+
 BASE_DIR = Path(__file__).resolve().parent
 ASSETS_DIR = BASE_DIR / "assets"
 
-# 1. Page Configuration
 st.set_page_config(
-    page_title="Galaxy Morphology Classifier", page_icon="🌌", layout="wide"
+    page_title="Galaxy Morphology Classifier",
+    page_icon="🌌",
+    layout="wide"
 )
 
 st.markdown(
@@ -25,50 +30,99 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# 2. Main Title and Subtitle
+# ------------------------------------------------------------
+# 2. Main Title and Introduction
+# ------------------------------------------------------------
+
 st.title("🌌 Automated Galaxy Morphology Classifier")
+
 st.markdown("""
-Welcome to the Galaxy Morphology Analysis Platform. This application leverages deep learning 
-to classify astronomical imagery into standard Hubble sequence morphological types.
+Welcome to the Galaxy Morphology Analysis Platform.
+
+This application uses transfer learning with EfficientNetB0
+to classify astronomical images into six broad morphological
+categories. The six-class model is an updated version of the
+original ten-class Galaxy10 DECaLS classification experiment.
 """)
 
 st.divider()
 
-# 3. High-Level Performance Metrics Row
+# ------------------------------------------------------------
+# 3. High-Level Model Metrics
+# ------------------------------------------------------------
+
 col1, col2, col3, col4 = st.columns(4)
+
 with col1:
-    st.metric(label="Model Accuracy", value="71.98%", delta="+2.39%")
+    st.metric(
+        label="Validation Accuracy",
+        value="78.69%"
+    )
+
 with col2:
-    st.metric(label="Precision (Macro)", value="0.70")
+    st.metric(
+        label="Validation Loss",
+        value="0.6096"
+    )
+
 with col3:
-    st.metric(label="Recall (Macro)", value="0.70")
+    st.metric(
+        label="Morphological Classes",
+        value="6"
+    )
+
 with col4:
-    st.metric(label="Total Test Images", value="3548")
+    st.metric(
+        label="Training Epochs",
+        value="47"
+    )
+
+st.caption(
+    "Metrics shown are from the final six-class Phase 3 model "
+    "on the validation set."
+)
 
 st.divider()
 
-# 4. Galaxy Classes Reference Image
-st.subheader("🌌 Galaxy10 DECals Morphological Classes")
+# ------------------------------------------------------------
+# 4. Original Galaxy10 Dataset Reference
+# ------------------------------------------------------------
+
+st.subheader("🌌 Original Galaxy10 DECaLS Dataset")
+
 IMAGE_PATH = ASSETS_DIR / "galaxy10.png"
 
-if os.path.exists(IMAGE_PATH):
+if IMAGE_PATH.exists():
     st.image(
         IMAGE_PATH,
-        caption="Galaxy10 DECals Dataset: 10 Morphological Classes (0–9)",
+        caption="Original Galaxy10 DECaLS Dataset: 10 Morphological Classes",
         use_container_width=True,
     )
 else:
-    st.info("Place `galaxy10.png` in your `assets/` folder to render reference classes.")
+    st.info(
+        "Place `galaxy10.png` in your `assets/` folder "
+        "to display the original dataset classes."
+    )
+
+st.markdown("""
+The original Galaxy10 DECaLS dataset contains 17,736 galaxy images
+across ten morphological categories. For the final application,
+related categories were consolidated into six broader classes.
+""")
 
 st.divider()
 
+# ------------------------------------------------------------
 # 5. Conversion from 10 Classes to 6 Classes
+# ------------------------------------------------------------
+
 st.subheader("🔄 From 10 Galaxy10 Classes to 6 Morphological Classes")
 
 st.markdown("""
-The original Galaxy10 DECaLS dataset contains 10 morphological classes. 
-For the application, related morphological categories are grouped into six broader classes 
-to provide a more interpretable classification scheme.
+The original ten categories were grouped according to their
+shared morphological characteristics. This produced a
+six-class classification framework while retaining the
+major structural distinctions between galaxies.
 """)
 
 class_mapping = pd.DataFrame({
@@ -84,8 +138,8 @@ class_mapping = pd.DataFrame({
         "Edge-on No Bulge",
         "Edge-on With Bulge",
     ],
-    "6-Class Category": [
-        "Distorted",
+    "Final Six-Class Category": [
+        "Disturbed",
         "Merging",
         "Elliptical",
         "Elliptical",
@@ -105,17 +159,21 @@ st.dataframe(
 )
 
 st.caption(
-    "Related Galaxy10 categories are merged based on their shared morphological characteristics."
+    "The original ten categories are consolidated into six "
+    "broader morphological classes."
 )
 
 st.divider()
 
-# 6. Dataset Class Distribution
+# ------------------------------------------------------------
+# 6. Six-Class Dataset Distribution
+# ------------------------------------------------------------
+
 st.subheader("📊 Six-Class Dataset Distribution")
 
 distribution_data = {
     "Class": [
-        "Distorted",
+        "Disturbed",
         "Merging",
         "Elliptical",
         "Barred Spiral",
@@ -162,72 +220,134 @@ fig.update_layout(
 st.plotly_chart(fig, use_container_width=True)
 
 st.caption(
-    "The six-class grouping reduces the original class imbalance by combining "
-    "morphologically related categories, while retaining the major structural distinctions."
+    "The six-class dataset contains 17,736 images. "
+    "Elliptical and Unbarred Spiral galaxies form the largest categories."
 )
 
 st.divider()
 
-# 7. Model Diagnostics
+# ------------------------------------------------------------
+# 7. Model Architecture
+# ------------------------------------------------------------
+
+st.subheader("🧠 Six-Class Model Architecture")
+
+st.markdown("""
+The final classifier uses **EfficientNetB0**, pretrained on ImageNet,
+as its feature extraction backbone.
+
+| Component | Configuration |
+|---|---|
+| Backbone | EfficientNetB0 |
+| Pretraining | ImageNet |
+| Input resolution | 224 × 224 × 3 |
+| Feature extraction | Global Average Pooling |
+| Fully connected layer | Dense (256 units, ReLU) |
+| Regularisation | Dropout (0.4) |
+| Output layer | Softmax (6 classes) |
+""")
+
+st.divider()
+
+# ------------------------------------------------------------
+# 8. Model Diagnostics and Training Progression
+# ------------------------------------------------------------
+
 st.subheader("🔬 Model Diagnostics & Progression")
 
 diag_col1, diag_col2 = st.columns(2)
 
 with diag_col1:
-    st.markdown("#### Confusion Matrix (Phase 2, Run 2)")
-    cm_path = ASSETS_DIR / "cm_phase3.png"
-    if os.path.exists(cm_path):
+    st.markdown("#### Six-Class Confusion Matrix")
+
+    cm_path = ASSETS_DIR / "cm_phase3_6class.png"
+
+    if cm_path.exists():
         st.image(
             cm_path,
-            caption="Confusion Matrix across 10 Morphological Classes",
+            caption="Confusion Matrix: Six-Class Phase 3 Model",
             use_container_width=True,
         )
     else:
         st.info(
-            "Place `cm_phase3.png` in your `assets/` folder to render the heatmap."
+            "Add your six-class Phase 3 confusion matrix as "
+            "`cm_phase3_6class.png` in the `assets/` folder."
         )
 
 with diag_col2:
     st.markdown("#### Training & Validation History")
-    history_path = ASSETS_DIR / "phase3_augmented_performance.png"
-    if os.path.exists(history_path):
+
+    history_path = ASSETS_DIR / "phase3_augmented_performance_6class.png"
+
+    if history_path.exists():
         st.image(
             history_path,
-            caption="Accuracy and Loss progression across epochs",
+            caption="Six-Class Model: Training and Validation Accuracy and Loss",
             use_container_width=True,
         )
     else:
         st.info(
-            "Place `phase3_augmented_performance.png` in your `assets/` folder to render the curves."
+            "Add your six-class training history as "
+            "`phase3_augmented_performance_6class.png` "
+            "in the `assets/` folder."
         )
 
 st.markdown("""
-**Key Diagnostic Insights:**
-* **Highest Performing:** Edge-on galaxies (Classes 8 & 9) achieved the strongest classification accuracy (>88% F1-score) due to distinct linear profile features.
-* **Primary Confusion:** Class 0 (Distorted) and Class 1 (Merging) showed significant overlap due to shared irregular, low-density tidal features.
+**Training observations:**
+
+- **Progressive fine-tuning:** The model was trained through
+  successive stages, beginning with a frozen feature extractor
+  and gradually fine-tuning the backbone.
+- **Data augmentation:** Spatial augmentation was introduced
+  during the final training stage to improve generalisation.
+- **Final performance:** The Phase 3 model achieved 78.69%
+  validation accuracy with a validation loss of 0.6096.
 """)
 
 st.divider()
 
-# 8. Model Iteration Table
+# ------------------------------------------------------------
+# 9. Model Iteration Comparison
+# ------------------------------------------------------------
+
 st.subheader("📈 Model Iteration Comparison")
 
 runs_data = {
-    "Run / Phase": [
+    "Training Stage": [
         "Phase 1",
         "Phase 2 - Run 1",
-        "Phase 2 - Run 2 ",
-        "Phase 3 - Augmented (Best)",
+        "Phase 2 - Run 2",
+        "Phase 3 - Augmented",
     ],
-    "Architecture / Details": [
-        "Baseline EfficientNetB0",
-        "Top 40 layers unfrozen",
-        "Top 40 layers unfrozen run 2",
-        "Augmented Images",
+    "Training Configuration": [
+        "Frozen EfficientNetB0 backbone",
+        "Top 40 layers fine-tuned",
+        "Continued fine-tuning",
+        "Augmented fine-tuning",
     ],
-    "Val Accuracy": ["72.89%", "77.54%", "78.49%", "78.69%"],
-    "Macro F1-Score": ["0.6253", "0.6960", "0.7147", "0.7204"],
+    "Validation Accuracy": [
+        "72.89%",
+        "77.54%",
+        "78.49%",
+        "78.69%",
+    ],
+    "Validation Loss": [
+        "0.7588",
+        "0.6544",
+        "0.6152",
+        "0.6096",
+    ],
 }
 
 df_runs = pd.DataFrame(runs_data)
-st.dataframe(df_runs, hide_index=True, use_container_width=True)
+
+st.dataframe(
+    df_runs,
+    hide_index=True,
+    use_container_width=True,
+)
+
+st.caption(
+    "Validation performance across the successive training stages "
+    "of the final six-class model."
+)
