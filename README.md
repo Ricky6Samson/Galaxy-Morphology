@@ -1,27 +1,29 @@
 
-# Galaxy Morphology Classification — 6-Class Experiment
+# Galaxy Morphology Classification Using Deep Learning
+### A Six-Class Experiment with Galaxy10 DECaLS
 
-## 1. Project Overview
+## 1. Overview
 
-This experiment explores automated galaxy morphology classification using deep learning and the Galaxy10 DECaLS dataset.
+Galaxy morphology provides important information about the structural properties and evolutionary characteristics of galaxies. Automated morphological classification offers a way to analyse large astronomical image datasets efficiently.
 
-Following feedback on the original 10-class classification approach, the experiment investigated whether grouping closely related morphological categories into broader classes could produce a more effective classification task.
+This project explores deep learning for galaxy morphology classification using the Galaxy10 DECaLS dataset.
 
-The original ten categories were reorganised into six broader morphological groups. An EfficientNetB0-based convolutional neural network was subsequently trained and fine-tuned to classify these groups.
+The initial approach involved classifying galaxies into ten morphological categories. Following feedback on the classification strategy, a second experiment was conducted to investigate whether consolidating closely related morphological categories into broader groups could produce more effective classification.
 
-## 2. Dataset
+The revised experiment introduced a six-class taxonomy and employed transfer learning with EfficientNetB0, followed by progressive fine-tuning and data augmentation.
 
-- **Dataset:** Galaxy10 DECaLS
-- **Total images:** 17,736
-- **Original categories:** 10
-- **Revised categories:** 6
-- **Train-validation split:** 80:20
-- **Splitting method:** Stratified sampling
-- **Random state:** 42
+## 2. Dataset and Morphological Classification
 
-### Class Restructuring
+**Dataset:** Galaxy10 DECaLS  
+**Total images:** 17,736  
+**Original categories:** 10  
+**Revised categories:** 6
 
-| Revised Class | Original Galaxy10 Categories | Image Count |
+The original categories were consolidated based on similarities in their observed morphological characteristics.
+
+### Revised Classification Scheme
+
+| Class | Original Galaxy10 Categories | Images |
 |---|---|---:|
 | Disturbed | Disturbed Galaxies | 1,081 |
 | Merging | Merging Galaxies | 1,853 |
@@ -29,45 +31,52 @@ The original ten categories were reorganised into six broader morphological grou
 | Barred Spiral | Barred Spiral | 2,043 |
 | Unbarred Spiral | Tight Spiral, Loose Spiral | 4,457 |
 | Edge-on | Edge-on without Bulge, Edge-on with Bulge | 3,296 |
+| **Total** | | **17,736** |
 
-The revised taxonomy groups related visual morphologies while retaining distinctions between major galaxy structures.
+The dataset was divided into training and validation subsets using an 80:20 stratified split, with a random state of 42.
 
-## 3. Model Architecture
+## 3. Methodology
 
-The experiment used **EfficientNetB0** with ImageNet-pretrained weights as the feature extraction backbone.
+### Model Architecture
+
+EfficientNetB0, pretrained on ImageNet, was used as the convolutional feature extraction backbone.
 
 The classification head consisted of:
 
 - Global Average Pooling
-- Dense layer (256 units, ReLU activation)
-- Dropout (0.4)
-- Output layer (6 units, Softmax activation)
+- Dense layer with 256 neurons and ReLU activation
+- Dropout layer with a rate of 0.4
+- Six-unit Softmax output layer
 
-The architecture was kept consistent across training phases, with the output layer adapted for six classes.
+The architecture retained the same feature extraction backbone while adapting the final classification layer to the revised taxonomy.
 
-## 4. Training Strategy
+### Training Strategy
 
-Training was conducted in three progressive stages.
+Training was organised into three progressive phases.
 
-### Phase 1 — Feature Extraction (Epochs 1–15)
+**Phase 1 — Feature Extraction (Epochs 1–15)**
 
-- The pretrained EfficientNetB0 backbone was frozen.
-- The newly added classification head was trained.
+- Froze the pretrained EfficientNetB0 backbone.
+- Trained the newly introduced classification head.
 
-### Phase 2 — Fine-tuning (Epochs 16–37)
+**Phase 2 — Fine-tuning (Epochs 16–37)**
 
-- The top 40 layers of the backbone were unfrozen.
-- Fine-tuning was conducted across two consecutive training runs.
-- A lower learning rate was used to adapt pretrained features to the galaxy dataset.
+- Unfroze the top 40 layers of the backbone.
+- Fine-tuned the pretrained features using a lower learning rate.
+- Conducted two consecutive training runs.
 
-### Phase 3 — Fine-tuning with Data Augmentation (Epochs 38–47)
+**Phase 3 — Fine-tuning with Data Augmentation (Epochs 38–47)**
 
-- Data augmentation was introduced during fine-tuning.
-- The model was further trained to improve its ability to handle variations in galaxy images.
+- Introduced data augmentation during fine-tuning.
+- Continued training to investigate its effect on validation performance.
 
-## 5. Validation Results
+The complete experiment consisted of 47 training epochs across the three phases.
 
-The following table presents the final validation metrics from each training stage.
+## 4. Experimental Results
+
+### Validation Performance
+
+The following results represent the final validation metrics recorded at each training stage.
 
 | Training Stage | Validation Accuracy | Validation Loss |
 |---|---:|---:|
@@ -76,82 +85,80 @@ The following table presents the final validation metrics from each training sta
 | Phase 2 — Run 2 | 78.49% | 0.6152 |
 | Phase 3 — Augmented | **78.69%** | **0.6096** |
 
-The final augmented training phase achieved the highest final validation accuracy and lowest validation loss among the four stages.
+The progression shows an improvement in validation performance during feature fine-tuning. The final augmented phase achieved the highest final validation accuracy and lowest validation loss.
 
-These values represent validation performance and should not be interpreted as independent test-set performance.
+The improvement between the second fine-tuning run and the augmented phase was modest.
+
+### Training Performance
+
+The following figure presents the overall training and validation accuracy and loss trajectories across all 47 epochs.
+
+![Master Training Performance](visuals2/master_training_performance.png)
+
+### Classification Performance
+
+Confusion matrices were generated at the end of each training stage to examine class-wise prediction behaviour.
+
+**Phase 1**
+
+![Phase 1 Confusion Matrix](visuals2/cm_phase1.png)
+
+**Phase 2 — Run 1**
+
+![Phase 2 Run 1 Confusion Matrix](visuals2/cm_phase2_run1.png)
+
+**Phase 2 — Run 2**
+
+![Phase 2 Run 2 Confusion Matrix](visuals2/cm_phase2_run2.png)
+
+**Phase 3**
+
+![Phase 3 Confusion Matrix](visuals2/cm_phase3.png)
+
+## 5. Model Interpretability
+
+Grad-CAM (Gradient-weighted Class Activation Mapping) was used to investigate the image regions contributing to the model's classification predictions.
+
+This provides a qualitative means of examining whether the network focuses on visually relevant galaxy structures when making predictions.
 
 ## 6. Final Model
 
 The Phase 3 checkpoint was selected as the final model based on its validation performance.
 
-- **Model architecture:** EfficientNetB0
-- **Output classes:** 6
-- **Model file:** `galaxy10_efficientnetb0_phase3.keras`
-- **Validation accuracy:** 78.69%
-- **Validation loss:** 0.6096
-
-The selected model is stored in the `model-2/` directory.
-
-## 7. Model Evaluation and Interpretability
-
-The experiment included visual evaluation of classification performance across the different training stages.
-
-The evaluation visualisations include:
-
-- Confusion matrices for each training stage.
-- Training and validation accuracy curves.
-- Training and validation loss curves.
-- A consolidated training performance plot covering all 47 epochs.
-
-Grad-CAM was also used to examine the image regions influencing the model's predictions, providing a qualitative view of its classification behaviour.
-
-## 8. Training Visualisations
-
-The `visuals2/` directory contains the visualisations generated during the six-class experiment.
-
-### Master Training Performance
-
-![Master Training Performance](visuals2/master_training_performance.png)
-
-### Individual Training Performance
-
-| Training Stage | Visualisation |
+| Parameter | Details |
 |---|---|
-| Phase 1 | `visuals2/phase1_performance.png` |
-| Phase 2 — Run 1 | `visuals2/phase2_run1_performance.png` |
-| Phase 2 — Run 2 | `visuals2/phase2_run2_performance.png` |
-| Phase 3 — Augmented | `visuals2/phase3_augmented_performance.png` |
+| Architecture | EfficientNetB0 |
+| Pretrained weights | ImageNet |
+| Classification classes | 6 |
+| Training epochs | 47 |
+| Validation accuracy | 78.69% |
+| Validation loss | 0.6096 |
+| Model checkpoint | `galaxy10_efficientnetb0_phase3.keras` |
 
-### Confusion Matrices
+The trained model is stored in the `model-2/` directory.
 
-| Training Stage | Visualisation |
-|---|---|
-| Phase 1 | `visuals2/cm_phase1.png` |
-| Phase 2 — Run 1 | `visuals2/cm_phase2_run1.png` |
-| Phase 2 — Run 2 | `visuals2/cm_phase2_run2.png` |
-| Phase 3 | `visuals2/cm_phase3.png` |
+## 7. Limitations and Further Exploration
 
-## 9. Repository Structure
+This experiment focuses on morphological classification from image data. Several considerations remain relevant:
+
+- The six-class taxonomy simplifies some distinctions present in the original dataset.
+- Validation accuracy alone does not establish generalisation to independent astronomical datasets.
+- The modest improvement during the augmentation phase should not be interpreted as statistically significant without further evaluation.
+- Morphological appearance alone cannot capture all the physical properties of a galaxy.
+
+Further exploration could investigate additional astronomical information, including spectroscopic features, to complement image-based morphology classification.
+
+## 8. Repository Structure
 
 ```text
 Galaxy-Morphology/
 │
 ├── comparison_visual/
-│
 ├── galaxy_classifier_app/
-│
-├── model-2/
-│   └── Updated six-class experiment model
-│
 ├── model/
-│   └── Original model files
-│
+├── model-2/
 ├── notebook/
-│   └── Experiment notebooks
-│
 ├── visuals/
-│   └── Original experiment visualisations
-│
 ├── visuals2/
 │   ├── cm_phase1.png
 │   ├── cm_phase2_run1.png
@@ -167,13 +174,12 @@ Galaxy-Morphology/
 └── README.md
 ```
 
-## 10. Key Takeaways
+## 9. Conclusion
 
-- Explored a revised six-class morphological taxonomy based on feedback on the original classification task.
-- Implemented transfer learning and progressive fine-tuning using EfficientNetB0.
-- Investigated the effect of data augmentation during fine-tuning.
-- Achieved 78.69% validation accuracy with the final model.
-- Used confusion matrices and training visualisations to examine classification performance.
-- Applied Grad-CAM to investigate the visual features influencing model predictions.
+This project investigates the application of transfer learning and deep learning to astronomical image classification.
 
-This experiment demonstrates an application of deep learning to astronomical image analysis and provides a foundation for exploring more physically informative galaxy classification approaches.
+By restructuring the original ten morphological categories into six broader classes, the experiment explored an alternative classification strategy and evaluated its performance through progressive fine-tuning.
+
+The final model achieved 78.69% validation accuracy. The experiment also incorporated confusion-matrix analysis and Grad-CAM to examine classification behaviour and model interpretability.
+
+Overall, this work represents an application of computational methods to observational astronomy, combining astronomical image data, neural network modelling and quantitative evaluation.
